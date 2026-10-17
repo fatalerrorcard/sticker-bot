@@ -209,10 +209,11 @@ async def on_photo(message: Message):
     async with tempfile.TemporaryDirectory(dir=str(DOWNLOADS)) as tmp:
         tmp_path = Path(tmp)
         source = tmp_path / "input.jpg"
-        await bot.download(photo, destination=source)
         try:
+            await bot.download(photo, destination=source)
             conv = convert_media(source, "image/jpeg", tmp_path)
         except Exception as e:
+            logger.exception("Ошибка обработки фото")
             await message.answer(f"❌ Не получилось обработать фото: {e}")
             return
         await _present_sticker(message, conv, is_video=False)
