@@ -330,9 +330,11 @@ async def _add_sticker_to_pack(message: Message, user_id: int) -> str:
             fmt = StickerFormat.STATIC
             upload_name = f"sticker_{int(time.time())}_{user_id}.png"
         sticker_input = FSInputFile(path, filename=upload_name)
+        logger.info("Загружаю стикер %s (%s) для пака %s", path, fmt, full_name)
         uploaded = await bot.upload_sticker_file(
             user_id=user_id, sticker=sticker_input, sticker_format=fmt
         )
+        logger.info("Загружен file_id=%s, добавляю в %s", uploaded.file_id, full_name)
         await bot.add_sticker_to_set(
             user_id=user_id,
             name=full_name,
@@ -342,6 +344,7 @@ async def _add_sticker_to_pack(message: Message, user_id: int) -> str:
                 format=fmt,
             ),
         )
+        logger.info("Стикер успешно добавлен в %s", full_name)
         # Успешно добавлен — больше не пытаемся добавлять тот же файл повторно
         last_sticker.pop(user_id, None)
         return (
