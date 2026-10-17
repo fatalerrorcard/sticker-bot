@@ -90,16 +90,46 @@ async def cmd_start(message: Message):
         "🎨 <b>Привет! Я умею делать стикеры из твоих фото и видео.</b>\n\n"
         "Все просто:\n"
         "• Отправь мне <b>фото</b> — получу статичный стикер\n"
-        "• Отправь <b>видео</b> (до 3 секунд) — сделаю анимированный WebM-стикер\n"
-        "• После этого полученный стикер можно добавить в твой персональный пак\n\n"
-        "Команды:\n"
-        "/newpack — создать свой стикер-пак\n"
-        "/mypack — показать ссылку на твой пак\n"
-        "/packset — выбрать стикер для нового пака\n"
-        "/add — добавить последний стикер в пак\n"
-        "/help — помощь"
+        "• Отправь <b>видео</b> — сделаю анимированный WebM-стикер\n"
+        "• Готовый стикер можно сразу добавить в твой персональный пак\n\n"
+        "Нажми кнопку ниже или используй команды."
     )
-    await message.answer(text)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🆕 Создать стикер-пак", callback_data="menu_newpack")],
+        [InlineKeyboardButton(text="📂 Мой стикер-пак", callback_data="menu_mypack")],
+        [InlineKeyboardButton(text="📖 Помощь", callback_data="menu_help")],
+    ])
+    await message.answer(text, reply_markup=kb)
+
+
+# Меню: управление из кнопок
+@dp.callback_query(F.data == "menu_newpack")
+async def menu_newpack(call: CallbackQuery, state: FSMContext):
+    await call.answer()
+    await call.message.delete()
+    await cmd_newpack(call.message, state)
+
+
+@dp.callback_query(F.data == "menu_mypack")
+async def menu_mypack(call: CallbackQuery):
+    await call.answer()
+    full_name = _pack_name(call.from_user.id)
+    try:
+        await bot.get_sticker_set(full_name)
+    except Exception:
+        await call.message.answer("У вас пока нет стикер-пака. Создайте через /newpack.")
+        return
+    await call.message.answer(
+        f"📂 <b>Ваш стикер-пак</b>\n\n"
+        f"Ссылка: https://t.me/addstickers/{full_name}\n\n"
+        "Добавлять стикеры можно кнопкой «➕ в пак» после отправки фото/видео."
+    )
+
+
+@dp.callback_query(F.data == "menu_help")
+async def menu_help(call: CallbackQuery):
+    await call.answer()
+    await cmd_help(call.message)  # сообщение из call.message — отправим новое
 
 
 @dp.message(Command("help"))
@@ -189,7 +219,11 @@ async def cmd_mypack(message: Message):
     except Exception:
         await message.answer("У вас пока нет стикер-пака. Создайте через /newpack.")
         return
-    await message.answer(f"Ваш пак: https://t.me/addstickers/{full_name}")
+    await message.answer(
+        f"📂 <b>Ваш стикер-пак</b>\n\n"
+        f"Ссылка: https://t.me/addstickers/{full_name}\n\n"
+        "Добавлять стикеры можно кнопкой «➕ в пак» после отправки фото/видео."
+    )
 
 
 # ----------------------------------------------------------------------------
