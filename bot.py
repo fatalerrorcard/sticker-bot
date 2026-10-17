@@ -59,7 +59,6 @@ BOT_ID: int = 0
 
 
 class CreatePackStates(StatesGroup):
-    waiting_for_name = State()
     waiting_for_title = State()
 
 
@@ -119,32 +118,18 @@ async def cmd_help(message: Message):
 # ----------------------------------------------------------------------------
 @dp.message(Command("newpack"))
 async def cmd_newpack(message: Message, state: FSMContext):
-    await state.set_state(CreatePackStates.waiting_for_name)
-    await message.answer(
-        "Создаём ваш стикер-пак.\n\n"
-        "Придумайте <b>название латиницей</b> (только a-z, 0-9, _), например: <code>mycat</code>\n"
-        "Это технический id пака. Отправьте его."
-    )
-
-
-@dp.message(CreatePackStates.waiting_for_name, F.text)
-async def pack_name(message: Message, state: FSMContext):
-    name = message.text.strip()
-    # Telegram требует минимум один стикер с эмодзи. Сохраним имя и попросим первый стикер.
-    if not all(c.isalnum() or c == "_" for c in name) or len(name) > 64:
-        await message.answer("⚠️ Только латинские буквы, цифры и _. Повторите.")
-        return
-    full_name = f"{name}_by_{BOT_USERNAME}"
-    await state.update_data(pack_name=full_name)
     await state.set_state(CreatePackStates.waiting_for_title)
-    await message.answer("Отлично! Теперь придумайте <b>название</b> для пака (как его видят люди), например «Мои котики».")
+    await message.answer(
+        "Создаём ваш стикер-пак 🎨\n\n"
+        "Придумайте <b>название</b> пака (как его видят люди), например: <code>Мои котики</code>\n"
+        "Отправьте название."
+    )
 
 
 @dp.message(CreatePackStates.waiting_for_title, F.text)
 async def pack_title(message: Message, state: FSMContext):
     title = message.text.strip()[:64]
-    data = await state.get_data()
-    full_name = data["pack_name"]
+    full_name = _pack_name(message.from_user.id)
 
     try:
         png_bytes = await _make_empty_sticker()
@@ -168,7 +153,13 @@ async def pack_title(message: Message, state: FSMContext):
         )
     except Exception as e:
         logger.exception("Не удалось создать пак")
-        await message.answer(f"❌ Не удалось создать пак: {e}\nПопробуйте другое имя (id).")
+        if "already occupied" in str(e) or "exact same" in str(e):
+            await message.answer(
+                f"ℹ️ Пак у вас уже есть.\nСсылка: https://t.me/addstickers/{full_name}\n\n"
+                "Просто пришлите фото/видео и нажмите «➕ в пак»."
+            )
+        else:
+            await message.answer(f"❌ Не удалось создать пак: {e}\nПопробуйте ещё раз.")
         return
 
     await state.clear()
@@ -191,7 +182,7 @@ async def _make_empty_sticker() -> BytesIO:
 
 @dp.message(Command("mypack"))
 async def cmd_mypack(message: Message):
-    full_name = f"stickers_{message.from_user.id}_by_{BOT_USERNAME}"
+    full_name = _pack_name(message.from_user.id)
     # Проверим, существует ли пак
     try:
         await bot.get_sticker_set(full_name)
@@ -285,7 +276,7 @@ async def _add_sticker_to_pack(message: Message, user_id: int) -> str:
     if path.suffix not in (".png", ".webm"):
         return "Неизвестный формат стикера."
 
-    full_name = f"stickers_{user_id}_by_{BOT_USERNAME}"
+    full_name = _pack_name(user_id)
     try:
         await bot.get_sticker_set(full_name)
     except Exception:
@@ -344,7 +335,7 @@ async def cmd_add(message: Message):
 async def fallback_text(message: Message, state: FSMContext):
     # Во время создания пака не перебиваем диалог — обработают FSM-хендлеры
     current = await state.get_state()
-    if current in (CreatePackStates.waiting_for_name.state, CreatePackStates.waiting_for_title.state):
+    if current == CreatePackStates.waiting_for_title.state:
         return
     await message.answer(
         "Не понял. Используйте /start для помощи, /newpack чтобы создать стикер-пак, "
