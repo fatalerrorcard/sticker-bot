@@ -25,6 +25,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
     Message,
     FSInputFile,
+    BufferedInputFile,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     CallbackQuery,
@@ -149,7 +150,7 @@ async def pack_title(message: Message, state: FSMContext):
         png_bytes = await _make_empty_sticker()
         uploaded = await bot.upload_sticker_file(
             user_id=message.from_user.id,
-            sticker=png_bytes,  # BytesIO
+            sticker=BufferedInputFile(file=png_bytes.getvalue(), filename="sticker.png"),
             sticker_format=StickerFormat.STATIC,
         )
         await bot.create_new_sticker_set(
@@ -206,7 +207,7 @@ async def cmd_mypack(message: Message):
 @dp.message(F.photo)
 async def on_photo(message: Message):
     photo = message.photo[-1]  # самое большое разрешение
-    async with tempfile.TemporaryDirectory(dir=str(DOWNLOADS)) as tmp:
+    with tempfile.TemporaryDirectory(dir=str(DOWNLOADS)) as tmp:
         tmp_path = Path(tmp)
         source = tmp_path / "input.jpg"
         try:
@@ -226,7 +227,7 @@ async def on_video(message: Message):
     else:
         media = message.animation
 
-    async with tempfile.TemporaryDirectory(dir=str(DOWNLOADS)) as tmp:
+    with tempfile.TemporaryDirectory(dir=str(DOWNLOADS)) as tmp:
         tmp_path = Path(tmp)
         source = tmp_path / "input.mp4"
         await bot.download(media, destination=source)
