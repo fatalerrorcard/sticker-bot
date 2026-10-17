@@ -50,6 +50,10 @@ DOWNLOADS.mkdir(exist_ok=True)
 bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
 
+# Username бота — заполняется в main() через get_me(). В aiogram у Bot нет .username.
+BOT_USERNAME: str = ""
+BOT_ID: int = 0
+
 
 class CreatePackStates(StatesGroup):
     waiting_for_name = State()
@@ -57,8 +61,8 @@ class CreatePackStates(StatesGroup):
 
 
 def _pack_name(user_id: int) -> str:
-    """Имя будущего пака. По конвенции aiogram не нужен суффикс _by_... самому боту."""
-    return f"stickers_{user_id}_by_{bot.id}"
+    """Имя будущего пака. Окончание _by_&lt;username> обязательно для Telegram."""
+    return f"stickers_{user_id}_by_{BOT_USERNAME}"
 
 
 # ----------------------------------------------------------------------------
@@ -127,7 +131,7 @@ async def pack_name(message: Message, state: FSMContext):
     if not all(c.isalnum() or c == "_" for c in name) or len(name) > 64:
         await message.answer("⚠️ Только латинские буквы, цифры и _. Повторите.")
         return
-    full_name = f"{name}_by_{bot.username}"
+    full_name = f"{name}_by_{BOT_USERNAME}"
     await state.update_data(pack_name=full_name)
     await state.set_state(CreatePackStates.waiting_for_title)
     await message.answer("Отлично! Теперь придумайте <b>название</b> для пака (как его видят люди), например «Мои котики».")
@@ -176,7 +180,7 @@ async def _make_empty_sticker() -> BytesIO:
 
 @dp.message(Command("mypack"))
 async def cmd_mypack(message: Message):
-    full_name = f"stickers_{message.from_user.id}_by_{bot.username}"
+    full_name = f"stickers_{message.from_user.id}_by_{BOT_USERNAME}"
     # Проверим, существует ли пак
     try:
         await bot.get_sticker_set(full_name)
@@ -269,7 +273,7 @@ async def _add_sticker_to_pack(message: Message, user_id: int) -> str:
     if path.suffix not in (".png", ".webm"):
         return "Неизвестный формат стикера."
 
-    full_name = f"stickers_{user_id}_by_{bot.username}"
+    full_name = f"stickers_{user_id}_by_{BOT_USERNAME}"
     try:
         await bot.get_sticker_set(full_name)
     except Exception:
@@ -331,10 +335,14 @@ async def fallback_text(message: Message, state: FSMContext):
 # Запуск
 # ----------------------------------------------------------------------------
 async def main():
+    global BOT_USERNAME, BOT_ID
     if not TOKEN:
         raise SystemExit("Задайте BOT_TOKEN в переменных окружения (см. .env.example)")
+    me = await bot.get_me()
+    BOT_USERNAME = me.username or (f"bot{me.id}")
+    BOT_ID = me.id
+    logger.info("Бот запущен: @%s (id=%s)", BOT_USERNAME, BOT_ID)
     await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("Бот запущен")
     await dp.start_polling(bot)
 
 
