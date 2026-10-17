@@ -75,19 +75,6 @@ async def global_error_handler(event: ErrorEvent):
             pass
 
 
-# Запасной ответ на любой непонятный текст, чтобы не было «молчания».
-@dp.message(F.text)
-async def fallback_text(message: Message, state: FSMContext):
-    # Если идёт создание пака — не перебиваем диалог, обработают FSM-хендлеры
-    current = await state.get_state()
-    if current in (CreatePackStates.waiting_for_name.state, CreatePackStates.waiting_for_title.state):
-        return
-    await message.answer(
-        "Не понял. Используйте /start для помощи, /newpack чтобы создать стикер-пак, "
-        "или просто пришлите фото/видео."
-    )
-
-
 # ----------------------------------------------------------------------------
 # Команды
 # ----------------------------------------------------------------------------
@@ -322,6 +309,22 @@ async def cb_add_to_pack(call: CallbackQuery):
 async def cmd_add(message: Message):
     result = await _add_sticker_to_pack(message, message.from_user.id)
     await message.answer(result)
+
+
+# ----------------------------------------------------------------------------
+# Запасной ответ на любой непонятный текст (последний в очереди).
+# Должен быть объявлен ПОСЛЕ всех команд и FSM-хендлеров, иначе перехватит их.
+# ----------------------------------------------------------------------------
+@dp.message(F.text, ~F.text.startswith("/"))
+async def fallback_text(message: Message, state: FSMContext):
+    # Во время создания пака не перебиваем диалог — обработают FSM-хендлеры
+    current = await state.get_state()
+    if current in (CreatePackStates.waiting_for_name.state, CreatePackStates.waiting_for_title.state):
+        return
+    await message.answer(
+        "Не понял. Используйте /start для помощи, /newpack чтобы создать стикер-пак, "
+        "или просто пришлите фото/видео."
+    )
 
 
 # ----------------------------------------------------------------------------
