@@ -1,0 +1,21 @@
+# Секреты
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Временные файлы и загрузки бота
+bot/downloads/
+
+# IDE / ОС
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
