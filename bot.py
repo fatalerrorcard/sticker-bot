@@ -17,15 +17,18 @@ except ImportError:
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart, Command
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
     Message,
     FSInputFile,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     CallbackQuery,
+    ErrorEvent,
 )
 
 from sticker_utils import convert_media, ANIM_DURATION_MAX
@@ -45,7 +48,7 @@ DOWNLOADS = WORK_DIR / "downloads"
 DOWNLOADS.mkdir(exist_ok=True)
 
 bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 
 
 class CreatePackStates(StatesGroup):
@@ -56,6 +59,33 @@ class CreatePackStates(StatesGroup):
 def _pack_name(user_id: int) -> str:
     """Имя будущего пака. По конвенции aiogram не нужен суффикс _by_... самому боту."""
     return f"stickers_{user_id}_by_{bot.id}"
+
+
+# ----------------------------------------------------------------------------
+# Глобальный перехват ошибок: бот никогда не должен молчать
+# ----------------------------------------------------------------------------
+@dp.errors()
+async def global_error_handler(event: ErrorEvent):
+    logger.exception("Глобальная ошибка при обработке апдейта", exc_info=event.exception)
+    update = event.update
+    if update.message:
+        try:
+            await update.message.answer("⚠️ Произошла ошибка. Попробуйте позже или напишите /start.")
+        except Exception:
+            pass
+
+
+# Запасной ответ на любой непонятный текст, чтобы не было «молчания».
+@dp.message(F.text)
+async def fallback_text(message: Message, state: FSMContext):
+    # Если идёт создание пака — не перебиваем диалог, обработают FSM-хендлеры
+    current = await state.get_state()
+    if current in (CreatePackStates.waiting_for_name.state, CreatePackStates.waiting_for_title.state):
+        return
+    await message.answer(
+        "Не понял. Используйте /start для помощи, /newpack чтобы создать стикер-пак, "
+        "или просто пришлите фото/видео."
+    )
 
 
 # ----------------------------------------------------------------------------
