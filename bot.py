@@ -5,6 +5,7 @@ import asyncio
 import logging
 import os
 import tempfile
+import time
 from io import BytesIO
 from pathlib import Path
 
@@ -324,9 +325,11 @@ async def _add_sticker_to_pack(message: Message, user_id: int) -> str:
         # Определяем формат по расширению файла
         if path.suffix == ".webm":
             fmt = StickerFormat.VIDEO
+            upload_name = f"sticker_{int(time.time())}_{user_id}.webm"
         else:
             fmt = StickerFormat.STATIC
-        sticker_input = FSInputFile(path)
+            upload_name = f"sticker_{int(time.time())}_{user_id}.png"
+        sticker_input = FSInputFile(path, filename=upload_name)
         uploaded = await bot.upload_sticker_file(
             user_id=user_id, sticker=sticker_input, sticker_format=fmt
         )
@@ -339,6 +342,8 @@ async def _add_sticker_to_pack(message: Message, user_id: int) -> str:
                 format=fmt,
             ),
         )
+        # Успешно добавлен — больше не пытаемся добавлять тот же файл повторно
+        last_sticker.pop(user_id, None)
         return (
             f"✅ Стикер добавлен в ваш пак.\n"
             f"Ссылка: https://t.me/addstickers/{full_name}"
