@@ -103,7 +103,7 @@ async def cmd_newpack(message: Message, state: FSMContext):
     )
 
 
-@dp.message(CreatePackStates.waiting_for_name)
+@dp.message(CreatePackStates.waiting_for_name, F.text)
 async def pack_name(message: Message, state: FSMContext):
     name = message.text.strip()
     # Telegram требует минимум один стикер с эмодзи. Сохраним имя и попросим первый стикер.
@@ -116,7 +116,7 @@ async def pack_name(message: Message, state: FSMContext):
     await message.answer("Отлично! Теперь придумайте <b>название</b> для пака (как его видят люди), например «Мои котики».")
 
 
-@dp.message(CreatePackStates.waiting_for_title)
+@dp.message(CreatePackStates.waiting_for_title, F.text)
 async def pack_title(message: Message, state: FSMContext):
     title = message.text.strip()[:64]
     data = await state.get_data()
