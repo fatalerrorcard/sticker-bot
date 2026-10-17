@@ -29,7 +29,9 @@ from aiogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
     ErrorEvent,
+    InputSticker,
 )
+from aiogram.enums import StickerFormat, StickerType
 
 from sticker_utils import convert_media, ANIM_DURATION_MAX
 
@@ -144,16 +146,24 @@ async def pack_title(message: Message, state: FSMContext):
     full_name = data["pack_name"]
 
     try:
-        png = await _make_empty_sticker()
+        png_bytes = await _make_empty_sticker()
         uploaded = await bot.upload_sticker_file(
             user_id=message.from_user.id,
-            sticker=png,  # BytesIO
+            sticker=png_bytes,  # BytesIO
+            sticker_format=StickerFormat.STATIC,
         )
         await bot.create_new_sticker_set(
             user_id=message.from_user.id,
             name=full_name,
             title=title,
-            stickers=[{"sticker": uploaded.file_id, "emoji_list": ["😀"]}],
+            sticker_type=StickerType.REGULAR,
+            stickers=[
+                InputSticker(
+                    sticker=uploaded.file_id,
+                    emoji_list=["😀"],
+                    format=StickerFormat.STATIC,
+                )
+            ],
         )
     except Exception as e:
         logger.exception("Не удалось создать пак")
@@ -284,14 +294,23 @@ async def _add_sticker_to_pack(message: Message, user_id: int) -> str:
         )
 
     try:
-        # Для статичных и видео-стикеров Bot API требует file_id из upload_sticker_file
+        # Определяем формат по расширению файла
+        if path.suffix == ".webm":
+            fmt = StickerFormat.VIDEO
+        else:
+            fmt = StickerFormat.STATIC
         sticker_input = FSInputFile(path)
-        uploaded = await bot.upload_sticker_file(user_id, sticker_input)
+        uploaded = await bot.upload_sticker_file(
+            user_id=user_id, sticker=sticker_input, sticker_format=fmt
+        )
         await bot.add_sticker_to_set(
             user_id=user_id,
             name=full_name,
-            sticker=uploaded.file_id,
-            emoji_list=["😀"],
+            sticker=InputSticker(
+                sticker=uploaded.file_id,
+                emoji_list=["😀"],
+                format=fmt,
+            ),
         )
         return (
             f"✅ Стикер добавлен в ваш пак.\n"
